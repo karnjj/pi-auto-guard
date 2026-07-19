@@ -1,0 +1,55 @@
+{
+  "name": "pi-auto-guard",
+  "version": "0.1.0",
+  "description": "Auto permission guard for Pi that classifies tool calls before execution",
+  "type": "module",
+  "author": "karnjj",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/karnjj/pi-auto-guard.git"
+  },
+  "homepage": "https://github.com/karnjj/pi-auto-guard#readme",
+  "bugs": {
+    "url": "https://github.com/karnjj/pi-auto-guard/issues"
+  },
+  "files": [
+    "extensions",
+    "src",
+    "README.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "SECURITY.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "tool-safety",
+    "coding-agent",
+    "permissions"
+  ],
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test",
+    "prepublishOnly": "npm run check"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/auto-guard.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "^0.74.2",
+    "@earendil-works/pi-coding-agent": "^0.74.2",
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2"
+  }
+}
