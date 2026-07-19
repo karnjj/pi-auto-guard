@@ -1,5 +1,6 @@
 import { complete } from "@earendil-works/pi-ai";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { DynamicBorder, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { Container, type SelectItem, SelectList, Text } from "@earendil-works/pi-tui";
 import { AutoClassifier } from "../src/classifier.ts";
 import { confirmationMessage } from "../src/format.ts";
 import { applyGuardMode, parseGuardCommand, shouldClassify, type GuardMode } from "../src/mode.ts";
@@ -101,7 +102,59 @@ async function decide(event: { toolName: string; input: Record<string, unknown> 
 
 function updateStatus(ctx: ExtensionContext): void {
   if (!ctx.hasUI) return;
-  ctx.ui.setStatus("auto-guard", `guard ${state.mode} · ${state.totalDenials} denied`);
+  const status = `guard ${state.mode} · ${state.totalDenials} denied`;
+  ctx.ui.setStatus("auto-guard", ctx.ui.theme.fg("dim", status));
+}
+
+const MODE_ITEMS: SelectItem[] = [
+  { value: "standard", label: "Standard", description: "Ask before consequential actions; deny dangerous ones." },
+  { value: "relaxed", label: "Relaxed", description: "Run ordinary asks automatically; confirm denied actions." },
+  { value: "yolo", label: "YOLO", description: "Bypass classification and run every tool call." },
+];
+
+type ModeSelection = GuardMode;
+
+async function selectMode(ctx: ExtensionContext): Promise<ModeSelection | null | undefined> {
+  // `mode` was added after earlier Pi extension type definitions. Feature-detect it
+  // so this package remains compatible with those releases.
+  const mode = (ctx as ExtensionContext & { mode?: string }).mode;
+  if (!ctx.hasUI || (mode !== undefined && mode !== "tui")) return undefined;
+
+  return ctx.ui.custom<ModeSelection | null>((tui, theme, _keybindings, done) => {
+    const container = new Container();
+    container.addChild(new DynamicBorder((text: string) => theme.fg("accent", text)));
+    container.addChild(new Text(theme.fg("accent", theme.bold("Auto Guard mode")), 1, 0));
+    container.addChild(new Text(theme.fg("muted", `Current: ${state.mode}`), 1, 0));
+
+    const list = new SelectList(MODE_ITEMS, MODE_ITEMS.length, {
+      selectedPrefix: (text) => theme.fg("accent", text),
+      selectedText: (text) => theme.fg("accent", text),
+      description: (text) => theme.fg("muted", text),
+      scrollInfo: (text) => theme.fg("dim", text),
+      noMatch: (text) => theme.fg("warning", text),
+    });
+    list.setSelectedIndex(MODE_ITEMS.findIndex((item) => item.value === state.mode));
+    list.onSelect = (item) => done(item.value as ModeSelection);
+    list.onCancel = () => done(null);
+    container.addChild(list);
+    container.addChild(new Text(theme.fg("dim", "↑↓ navigate • enter select • esc cancel"), 1, 0));
+    container.addChild(new DynamicBorder((text: string) => theme.fg("accent", text)));
+
+    return {
+      render: (width) => container.render(width),
+      invalidate: () => container.invalidate(),
+      handleInput: (data) => {
+        list.handleInput(data);
+        tui.requestRender();
+      },
+    };
+  });
+}
+
+function resetGuard(): void {
+  state.mode = "standard";
+  state.consecutiveDenials = 0;
+  state.totalDenials = 0;
 }
 
 export default function autoGuard(pi: ExtensionAPI): void {
@@ -158,13 +211,16 @@ export default function autoGuard(pi: ExtensionAPI): void {
   pi.registerCommand("auto-guard", {
     description: "Show status, select a guard mode, or reset Auto Guard",
     handler: async (args, ctx) => {
-      const command = parseGuardCommand(args);
+      let command = parseGuardCommand(args);
+      if (command.kind === "status" && args.trim().length === 0) {
+        const selection = await selectMode(ctx);
+        if (selection === null) return;
+        if (selection) command = { kind: "mode", mode: selection };
+      }
+
       if (command.kind === "mode") state.mode = command.mode;
-      else if (command.kind === "reset") {
-        state.mode = "standard";
-        state.consecutiveDenials = 0;
-        state.totalDenials = 0;
-      } else if (command.kind === "invalid") {
+      else if (command.kind === "reset") resetGuard();
+      else if (command.kind === "invalid") {
         ctx.ui.notify("Usage: /auto-guard [standard|relaxed|yolo|reset]", "warning");
         return;
       }

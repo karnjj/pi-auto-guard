@@ -39,7 +39,7 @@ Pi Auto Guard uses the active Pi model and its existing credentials. To use a di
 PI_AUTO_GUARD_MODEL=provider/model-id pi -e .
 ```
 
-Run `/auto-guard` with no argument to show the current status. Select a mode or reset the guard with:
+Run `/auto-guard` with no argument to open an interactive mode selector. Use `/auto-guard status` to show the current status. You can also select a mode or reset the guard by typing:
 
 Auto Guard starts in `standard` mode. Switch modes with:
 
